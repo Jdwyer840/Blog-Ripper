@@ -8,6 +8,7 @@ from urllib.request import urlretrieve
 from bs4 import BeautifulSoup
 import requests
 
+from html_renderer.blog.rab_post import RABPost
 from .. import settings
 from ..utils.wordpress_post import WordPressPost
 
@@ -21,14 +22,29 @@ class BlogProcessor:
         self.posts_response: Optional[list[dict]] = None
         self.posts = []
         self.mode = 'RAB'
+        self._build_file_path()
 
     def process(self):
         self._fetch_post_data()
         self._build_post_objects()
         # TODO after the blogs are processed
-        # TODO 1) make the print html files
+        # TODO 1) make the print html files DONE
         # TODO 2) then the blogs need to be written to the main html file.
         # TODO 3) models for the posts?
+
+    def _build_file_path(self) -> None:
+        self.html_to_upload_file_path = f"{settings.MEDIA_ROOT}/{'RAB' if self._is_mode_rab() else 'MGO'}/{datetime.datetime.today().strftime('yyyy-mm-dd')}"
+
+    def _is_mode_rab(self):
+        return self.mode == "RAB"
+
+    def _build_post_details_html_files(self) -> None:
+        # using (FileStream fs = new FileStream(path + "\\" + date + "_" + Posts.Brand + type, FileMode.Create))
+        for post in self.posts:
+            post_file_path = f""
+            with open(self.html_to_upload_file_path, 'w') as file:
+                file.write(RABPost(post).render())
+
 
     def _write_blog_posts_details_files(self) -> None:
         print()
@@ -70,7 +86,7 @@ class BlogProcessor:
             post.plan_url = f"{start_of_week_date}_{brand}_{'.html' if self.mode == 'RAB' else '.shtml'}"
             post.print_url = f"{start_of_week_date}_{brand}_print{'.html' if self.mode == 'RAB' else '.shtml'}"
 
-            post.title = title.replace('<br>', '')
+            post.title = post.title.replace('<br>', '')
             if len(p_tags) > 0 and len(p_tags[0].contents) <= 2:
                 first_child = p_tags[0].contents[0]
                 # Check if the first child has attributes and if it’s a tag (like an <img>)
