@@ -1,8 +1,10 @@
 venv
 .env
 media
-templaes
+templates
 .idea
 db.sqlite3
 **/__pycache__/
+blog_ripper/__pycache__/
 *.pyc
+logs

@@ -20,5 +20,5 @@ from blog_ripper import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('blogrip/', views.my_view_func)
+    path('blogrip/', views.rip_blogs)
 ]

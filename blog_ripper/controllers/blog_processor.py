@@ -1,5 +1,6 @@
 import datetime
-import json
+import html
+import logging
 import os
 import re
 from typing import Optional
@@ -8,9 +9,10 @@ from urllib.request import urlretrieve
 from bs4 import BeautifulSoup
 import requests
 
-from html_renderer.blog.rab_post import RABPost
+from html_renderer.blog.blog_post import BlogPost
+from html_renderer.blog.blog_print import BlogPrint
 from .. import settings
-from ..utils.wordpress_post import WordPressPost
+from utilities.wordpress_post import WordPressPost
 
 
 class BlogProcessor:
@@ -22,48 +24,64 @@ class BlogProcessor:
         self.posts_response: Optional[list[dict]] = None
         self.posts = []
         self.mode = 'RAB'
+        self.seen_brands_count_map = {}
+        self.satellite_feed = logging.getLogger('satellite_feed')
+        self.satellite_feed.error('UH OH TEST')
         self._build_file_path()
 
     def process(self):
         self._fetch_post_data()
         self._build_post_objects()
+        # TODO maybe name these better
+        self._write_blog_posts_html()
         # TODO after the blogs are processed
         # TODO 1) make the print html files DONE
         # TODO 2) then the blogs need to be written to the main html file.
         # TODO 3) models for the posts?
 
     def _build_file_path(self) -> None:
-        self.html_to_upload_file_path = f"{settings.MEDIA_ROOT}/{'RAB' if self._is_mode_rab() else 'MGO'}/{datetime.datetime.today().strftime('yyyy-mm-dd')}"
+        mode_folder = 'RAB' if self._is_mode_rab() else 'MGO'
+        date_str = datetime.datetime.today().strftime('%m%d%y')  # Corrected strftime format
+        self.html_to_upload_file_path = os.path.join(settings.MEDIA_ROOT, mode_folder, date_str)
+        os.makedirs(self.html_to_upload_file_path, exist_ok=True)
 
-    def _is_mode_rab(self):
+    def _is_mode_rab(self) -> bool:
         return self.mode == "RAB"
 
-    def _build_post_details_html_files(self) -> None:
+    def _write_blog_posts_html(self) -> None:
         # using (FileStream fs = new FileStream(path + "\\" + date + "_" + Posts.Brand + type, FileMode.Create))
-        for post in self.posts:
-            post_file_path = f""
-            with open(self.html_to_upload_file_path, 'w') as file:
-                file.write(RABPost(post).render())
+        try:
+            for post in self.posts:
+                # Construct the directory path, separate from the file name
+                directory_path = self.html_to_upload_file_path
+                os.makedirs(directory_path, exist_ok=True)
+
+                # Join the directory with the filename
+                # post_file_path = os.path.join(directory_path, post.plan_url)
+
+                # Write to the file (post_file_path is now a full file path)
+                with open(os.path.join(directory_path, post.plan_url), 'w') as file:
+                    file.write(BlogPost(post).render())
+                with open(os.path.join(directory_path, post.print_url), 'w') as file:
+                    file.write(BlogPrint(post).render())
 
 
-    def _write_blog_posts_details_files(self) -> None:
-        print()
-        for post in self.posts:
-            print('use the jinja templates and file thing. just')
+        except Exception as e:
+            self.satellite_feed.error(f"Blogs fucked up: {str(e)}")
+            raise
 
     def _build_post_objects(self):
-        seen_brands = []
-        i = 0
         for data in self.posts_response:
             post = WordPressPost()
-            post.title = data.get('title')
-            brand = re.sub(r'\d+', '', post.title.split(" ")[0])
-            if brand not in seen_brands:
+            # TODO maybe make the true safe get function
+            post.title = html.unescape(data.get('title', {}).get('rendered', '').replace('<br>', ''))
+            post.brand = re.sub(r'\W+', '', post.title.split(" ")[0]).lower()
+            if post.brand not in self.seen_brands_count_map.keys():
                 # make sure this works the same as the code in c#
-                seen_brands.append(brand)
+                self.seen_brands_count_map[post.brand] = 1
             else:
-
-                seen_brands.append(f"{brand}{i}")
+                self.seen_brands_count_map[post.brand] += 1
+                post.brand = f"{post.brand}{self.seen_brands_count_map[post.brand]}"
 
             post.date = data.get('date')  # make proper data time
             post_html_str: str = data.get('content', {}).get('rendered')
@@ -82,11 +100,11 @@ class BlogProcessor:
                     break
 
             # TODO Image Gathering and naming the html / shtml files.
-            start_of_week_date = self.get_monday_of_current_week()
-            post.plan_url = f"{start_of_week_date}_{brand}_{'.html' if self.mode == 'RAB' else '.shtml'}"
-            post.print_url = f"{start_of_week_date}_{brand}_print{'.html' if self.mode == 'RAB' else '.shtml'}"
+            start_of_week_date = self.get_monday_of_current_week_date_str()
+            # TODO is plan url the right name ?
+            post.plan_url = f"{start_of_week_date}_{post.brand}{'.html' if self.mode == 'RAB' else '.shtml'}"
+            post.print_url = f"{start_of_week_date}_{post.brand}_print{'.html' if self.mode == 'RAB' else '.shtml'}"
 
-            post.title = post.title.replace('<br>', '')
             if len(p_tags) > 0 and len(p_tags[0].contents) <= 2:
                 first_child = p_tags[0].contents[0]
                 # Check if the first child has attributes and if it’s a tag (like an <img>)
@@ -95,16 +113,13 @@ class BlogProcessor:
                     # plan_image = first_child['src']
             if post.plan_image:
                 post.plan_image = f"images/{self.download_post_image(post, start_of_week_date)}"
+
             self.posts.append(post)
 
-
-
-    def download_post_image(self, post_data: WordPressPost, post_date: datetime.datetime):
+    def download_post_image(self, post_data: WordPressPost, post_date: str) -> str:
         image_name = f"{post_date}_{post_data.brand}_promo.png"
-        temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
-        os.makedirs(temp_dir, exist_ok=True)
-                    # download image to this path)
-        urlretrieve(post_data.plan_image, temp_dir)
+        image_path = os.path.join(self.html_to_upload_file_path, image_name)
+        urlretrieve(post_data.plan_image, image_path)
 
         return image_name
         # public string ImageDownload(string imgURL, string brand, string path, string date)
@@ -121,14 +136,16 @@ class BlogProcessor:
         #     return imageString;
         # }
 
+    # def get_monday_of_current_week_date_str(self) -> str:
+    #     # Monday is the start of the week with datetime.datetime
+    #     today = datetime.datetime.today()
+    #     start_of_week = 0  # Monday is 0 in Python's weekday()
+    #     diff = (today.weekday() - start_of_week) % 7
+    #     return (today - datetime.timedelta(days=diff)).strftime('%m%d%y')
 
-    def get_monday_of_current_week(self) -> datetime.datetime:
+    def get_monday_of_current_week_date_str(self) -> str:
         # Monday is the start of the week with datetime.datetime
-        today = datetime.today()
-        start_of_week = 0  # Monday is 0 in Python's weekday()
-        diff = (today.weekday() - start_of_week) % 7
-        return today - datetime.timedelta(days=diff)
-
+        return datetime.datetime.today().strftime('%m%d%y')
 
     def replace_links(self, str_to_replace_links: str) -> str:
         # Compile the regex pattern to find plan_id
@@ -146,7 +163,7 @@ class BlogProcessor:
 
         # Define the replacement pattern and apply re.sub
         pattern = r"http.*app\.coopconnect\.com.*plan_id=(\d*).*\""
-        source = re.sub(pattern, lambda: self.local_replace_match_case(link_replacement_str), str_to_replace_links, flags=re.IGNORECASE)
+        source = re.sub(pattern, lambda _: self.local_replace_match_case(link_replacement_str), str_to_replace_links, flags=re.IGNORECASE)
         return source
 
     def local_replace_match_case(self, replace_with: str) -> str:
@@ -166,10 +183,13 @@ class BlogProcessor:
     # print(second_p)
     def _fetch_post_data(self):
         # this hsould also save to a table the post data, so we can use it to reference
-        response = requests.get(self.url)
+        self.satellite_feed.info('Fetching posts')
+        response = requests.get(f'{self.url}?per_page={self.number_of_posts}')
         response.raise_for_status()
         self.posts_response = response.json()
-        print(json.dumps(self.posts_response, indent=4))
+        self.satellite_feed.info('Posts fetched')
+
+        # print(json.dumps(self.posts_response, indent=4)s)
 
 
 # Installing collected packages: urllib3, idna, charset-normalizer, certifi, requests

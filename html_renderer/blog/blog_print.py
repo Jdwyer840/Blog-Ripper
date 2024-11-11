@@ -1,10 +1,10 @@
-from blog_ripper.utils.wordpress_post import WordPressPost
+from utilities.wordpress_post import WordPressPost
 from html_renderer.base import BaseTemplate
 
 
-class RABPost(BaseTemplate):
+class BlogPrint(BaseTemplate):
 
-    template = "template/RAB/post.html"
+    template = "blog/print.html"
 
     def __init__(self, data: WordPressPost):
         # TODO

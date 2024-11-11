@@ -1,23 +1,20 @@
-from jinja2 import Template
+import os
+
+from jinja2 import Template, Environment, FileSystemLoader
 from typing import Optional
 
 from blog_ripper import settings
 
 
-class BaseTemplate(Template):
+class BaseTemplate:
 
     context: Optional[dict] = None
 
+    env = Environment(loader=FileSystemLoader(os.path.join(settings.BASE_DIR, 'templates')))
+
     def __init__(self, template_path: str, context: dict = None):
-        super().__init__(self._load_template(template_path))
-        self.context = context
+        self.template = self.env.get_template(template_path)
+        self.context = context or {}
 
     def render(self) -> str:
-        return super().render(**self.context)
-
-    @staticmethod
-    def _load_template(template_file: str) -> str:
-        """Reads the template file and returns its content as a string."""
-        path = f'{settings.BASE_DIR}/templates/{template_file}'
-        with open(path, "r") as file:
-            return file.read()
+        return self.template.render(self.context)
