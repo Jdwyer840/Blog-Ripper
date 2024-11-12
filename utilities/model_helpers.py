@@ -180,8 +180,12 @@ class ModelMixins:
         class Meta:
             abstract = True
 
+
     class Upsertable(Clearable, models.Model):
         """Will only call save() if the row doesn't exist or some field has changed"""
+
+        class Meta:
+            abstract = True
 
         @classmethod
         def upsert(cls: Any, get_fields: Union[dict, models.Model], set_fields: dict = None) -> ModelHelpers.UpsertResult:
@@ -280,7 +284,8 @@ class ModelMixins:
             if to_create:
                 cls.objects.bulk_create(to_create)
             if to_update:
-                cls.objects.bulk_update(to_update, update_fields)\
+                cls.objects.bulk_update(to_update, update_fields)
+
 
     @staticmethod
     @transaction.atomic
@@ -368,3 +373,17 @@ class ModelMixins:
 
         class Meta:
             abstract = True
+
+
+class ConfigDict(dict):
+    namespace = "unknown"
+
+    class MissingConfigurationField(Exception):
+        def __init__(self, namespace: str, key: Any):
+            super().__init__(f'Configuration {namespace}.{key} not found.')
+
+    def __getitem__(self, key: Any) -> Any:
+        try:
+            return super().__getitem__(key)
+        except KeyError:
+            raise ConfigDict.MissingConfigurationField(namespace=self.namespace, key=key)

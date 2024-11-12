@@ -4,8 +4,9 @@ from typing import Optional
 # @dataclass
 
 
-class WordPressPost:
+class COOPBlogPost:
     plan_url: Optional[str] = None
+    wordpress_post_id: Optional[int] = None
     brand: Optional[str] = None
     print_url: Optional[str] = None
     date_created: Optional[datetime] = None

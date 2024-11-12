@@ -10,7 +10,7 @@ from utilities.common import CoreUtilities
 from utilities.model_helpers import ModelMixins
 
 
-class CronJob(models.Model):
+class CronJob(ModelMixins.BaseModelWithoutBy):
     default_now = datetime.datetime.now()
     schedule = models.CharField(max_length=512, null=False)
     schedule_description = models.TextField(null=True, blank=True)
@@ -21,7 +21,8 @@ class CronJob(models.Model):
     active = models.BooleanField(null=False, blank=False)
 
     class Meta:
-        abstract = True
+        db_table = 'cron_job'
+        verbose_name_plural = 'Cron Jobs'
 
     target_tz = CoreUtilities.datetime_zoneinfo('America/Chicago')
 
@@ -93,7 +94,7 @@ class CronJob(models.Model):
         super().save(*args, **kwargs)
 
 
-class CronJobHistory(ModelMixins.PKID, models.Model):
+class CronJobHistory(ModelMixins.PKID):
 
     def __str__(self) -> str:
         return self.job_name
@@ -111,7 +112,8 @@ class CronJobHistory(ModelMixins.PKID, models.Model):
         super().save(*args, **kwargs)
 
     class Meta:
-        abstract = True
+        db_table = 'cron_job_history'
+        verbose_name_plural = 'Cron Job History'
 
     @classmethod
     def create_cron_job_history(cls: Any, cron_job: CronJob, last_run: datetime, runtime: float, success: bool) -> 'CronJobHistory':
@@ -141,32 +143,28 @@ class CronJobHistory(ModelMixins.PKID, models.Model):
         cron_history.status = status
         cron_history.save()
 
-"""configuration can also have a map field type, and when map is selected thee form should update
-to list out the fields and have the ability
-"""
 
-
-class BlogPost(ModelMixins.BaseModelWithoutBy, models.Model):
+class COOPBlogPost(ModelMixins.BaseModelWithoutBy):
     class BlogTypes(models.TextChoices):
         RAB = 'RAB', 'RAB'
         MGO = 'MGO', 'MGO'
 
     plan_url = models.URLField(max_length=255, null=True, blank=True)
-    brand = models.CharField(max_length=255, null=True, blank=True)
+    wordpress_post_id = models.BigIntegerField(null=False, blank=False)
+    brand = models.CharField(max_length=255, null=False, blank=False)
     print_url = models.URLField(max_length=255, null=True, blank=True)
-    post_date = models.DateField(null=True, blank=True)  # Date-only for uniqueness
-    title = models.CharField(max_length=255, null=True, blank=True)
+    post_date = models.DateField(null=False, blank=False)  # Date-only for uniqueness
+    title = models.CharField(max_length=255, null=False, blank=False)
     plan_image = models.URLField(max_length=255, null=True, blank=True)
     paragraph1 = models.TextField(null=True, blank=True)
     paragraph2 = models.TextField(null=True, blank=True)
     paragraph3 = models.TextField(null=True, blank=True)
     paragraph4 = models.TextField(null=True, blank=True)
-    date = models.DateTimeField(null=True, blank=True)
-    blog_type = models.CharField(null=False, blank=False, choices=BlogTypes.choices)
+    blog_type = models.CharField(null=False, blank=False, choices=BlogTypes.choices, max_length=5)
 
     class Meta:
-        verbose_name = "WordPress Post"
-        verbose_name_plural = "WordPress Posts"
+        db_table = "blog_post"
+        verbose_name_plural = "Blog Posts"
         constraints = [
             models.UniqueConstraint(fields=['brand', 'title', 'post_date'], name='unique_post_constraint')
         ]
@@ -175,14 +173,27 @@ class BlogPost(ModelMixins.BaseModelWithoutBy, models.Model):
         return self.title or "WordPressPost"
 
 
-class BlogPostJobHistory(ModelMixins.BaseModelWithoutBy, models.Model):
-    timestamp = models.DateTimeField(auto_now_add=True)  # Time when the job was processed
-
+class COOPBlogRipJobHistory(ModelMixins.BaseModelWithoutBy):
+    job_start = models.DateTimeField(auto_now_add=True)
+    job_end = models.DateTimeField(auto_now_add=True)
+    errors = models.TextField()
     # Many-to-many field to store blog posts processed by this job
-    blog_posts = models.ManyToManyField(BlogPost, related_name="job_histories")
+    blog_posts = models.ManyToManyField(COOPBlogPost, related_name="blog_rip_job_posts_processed")
+
+    class Meta:
+        db_table = "blog_rip_job_history"
+        verbose_name_plural = "Blog Rip Job History"
 
     def __str__(self):
         return f"Job {self.id} at {self.timestamp}"
 
     def count_processed_posts(self) -> int:
         return self.blog_posts.count()
+
+    def time_elapsed(self):
+        if not self.job_start:
+            return "No start time."
+        if self.job_end:
+            delta = self.job_end - self.job_start
+            return str(delta)
+        return "In progress."
