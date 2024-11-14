@@ -16,7 +16,7 @@ class COOPBlogPost:
     paragraph2: Optional[str] = None
     paragraph3: Optional[str] = None
     paragraph4: Optional[str] = None
-    date: Optional[datetime] = None
+    date: Optional[str] = None
 
     def __init__(self, data: dict = None):
         if data:

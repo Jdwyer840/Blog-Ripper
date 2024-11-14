@@ -9,6 +9,15 @@ import rapidjson
 
 class CoreUtilities:
 
+    datetime_formats_ymd_standard = '%Y-%m-%d'
+    datetime_formats_ymd_underscores = '%Y_%m_%d'
+    datetime_formats_ymd_forward_slash = '%Y/%m/%d'
+
+    datetime_formats_ymdhms_standard = datetime_formats_ymd_standard + ' ' + '%H:%M:%S'
+    datetime_formats_ymdhmsz_standard = datetime_formats_ymdhms_standard + " %Z"
+    datetime_formats_ymd_tight = '%Y%m%d'
+    datetime_formats_ymdhms_tight = datetime_formats_ymd_tight + '%H%M%S'
+
     @staticmethod
     def read_file(file_path):
         with open(file_path, 'r') as file:
@@ -69,3 +78,79 @@ class CoreUtilities:
     def regex_replace(pattern: Any, repl: str, text: str) -> str:
         """Normalize re's unintuitive naming of re.search(), re.match(), re.findall(), etc."""
         return re.sub(pattern=pattern, repl=repl, string=text)
+
+    @staticmethod
+    def extract_date_format_from_date_str(date_str: str, return_datetime: bool = False) -> str | datetime.datetime | None:
+        formats_to_try = [
+            "%Y-%m-%d",
+            "%Y-%m-%d %H:%M",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M:%S.%f",
+            "%Y/%m/%d",
+            "%Y/%m/%d %H:%M",
+            "%Y/%m/%d %H:%M:%S",
+            "%Y/%m/%d %H:%M:%S.%f",
+
+            "%m-%d-%Y",
+            "%m-%d-%y",
+            "%m-%d-%Y %H:%M",
+            "%m-%d-%Y %H:%M:%S",
+            "%m-%d-%Y %H:%M:%S.%f",
+            "%m/%d/%Y",
+            "%m/%d/%Y %H:%M",
+            "%m/%d/%Y %H:%M:%S",
+            "%m/%d/%Y %H:%M:%S.%f",
+
+            "%d-%m-%Y",
+            "%d-%m-%Y %H:%M",
+            "%d-%m-%Y %H:%M:%S",
+            "%d-%m-%Y %H:%M:%S.%f",
+            "%d/%m/%Y",
+            "%d/%m/%Y %H:%M",
+            "%d/%m/%Y %H:%M:%S",
+            "%d/%m/%Y %H:%M:%S.%f",
+
+            "%Y-%m-%dT%H:%M",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S.%f",
+            "%Y/%m/%dT%H:%M",
+            "%Y/%m/%dT%H:%M:%S",
+            "%Y/%m/%dT%H:%M:%S.%f",
+            "%Y.%m.%d",
+            "%Y.%m.%d %H:%M",
+            "%Y.%m.%d %H:%M:%S",
+            "%Y.%m.%d %H:%M:%S.%f",
+
+            "%d.%m.%Y",
+            "%d.%m.%Y %H:%M",
+            "%d.%m.%Y %H:%M:%S",
+            "%d.%m.%Y %H:%M:%S.%f",
+
+            "%Y-%m-%dT%H:%M:%SZ",
+            "%Y-%m-%dT%H:%M:%S%z",
+            "%Y-%m-%dT%H:%M:%S.%fZ",
+            "%Y-%m-%dT%H:%M:%S.%f%z",
+
+            "%B %d, %Y"
+        ]
+
+        for date_format in formats_to_try:
+            try:
+                parsed = datetime.datetime.strptime(date_str, date_format)
+                if return_datetime:
+                    return parsed
+                return date_format
+            except ValueError:
+                continue
+        return None
+
+    @staticmethod
+    def datetime_format(dt: datetime.datetime, fmt: str = datetime_formats_ymdhms_standard) -> str:
+        """Get string representation of a datetime"""
+        return dt.strftime(fmt)
+
+    @staticmethod
+    def datetime_str_reformat(dt_str: str, dt_str_fmt: str, new_fmt: str = datetime_formats_ymdhms_standard) -> str:
+        """Convert datetime to date string"""
+        datetime_obj = datetime.datetime.strptime(dt_str, dt_str_fmt)
+        return CoreUtilities.datetime_format(datetime_obj, new_fmt)

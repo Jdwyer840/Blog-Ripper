@@ -6,9 +6,10 @@ import re
 from typing import Optional
 from urllib.request import urlretrieve
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup  # noqa
 import requests
 
+from html_renderer.blog.blog_main import BlogMain
 from html_renderer.blog.blog_post import BlogPost
 from html_renderer.blog.blog_print import BlogPrint
 from .. import settings
@@ -17,20 +18,17 @@ from utilities.wordpress_post import COOPBlogPost
 
 class BlogProcessor:
 
-    current_ripped_post: Optional[COOPBlogPost] = None
-
-    def __init__(self, number_of_posts: int = 11):
+    def __init__(self, number_of_posts: int = 12):
         self.url = "https://promotions.coopconnect.com/wp-json/wp/v2/posts/"
         self.number_of_posts = number_of_posts
 
         self.posts_response: Optional[list[dict]] = None
         self.posts = []
-        self.mode = 'RAB'
+        self.mode = 'MGO'
         self.seen_brands_count_map = {}
         self.satellite_feed = logging.getLogger('satellite_feed')
         self.satellite_feed.error('UH OH TEST')
         self._build_file_path()
-        self.current_ripped_post = None
 
     def process(self):
         self._fetch_wordpress_post_data()
@@ -55,20 +53,28 @@ class BlogProcessor:
             self.posts.append(coop_post)
 
     def _write_coop_blog_posts_linked_html_files(self) -> None:
+        main_posts: list[COOPBlogPost] = []
         try:
             for post in self.posts:
                 directory_path = self.html_to_upload_file_path
                 os.makedirs(directory_path, exist_ok=True)
+                post_html = BlogPost(post).render()
                 with open(os.path.join(directory_path, post.plan_url), 'w') as file:
-                    file.write(BlogPost(post).render())
+                    file.write(post_html)
                 with open(os.path.join(directory_path, post.print_url), 'w') as file:
                     file.write(BlogPrint(post).render())
+                main_posts.append(post)
+            with open(os.path.join(self.html_to_upload_file_path, 'blog_main.html'), 'w') as file:
+                file.write(BlogMain(blog_post_objs=main_posts).render())
         except Exception as e:
+            # TODO cat errors for a post ? maybe have an error field in thepost model
             self.satellite_feed.error(f"Blogs fucked up: {str(e)}")
-            raise
+            raise e
 
     def _rip_title_date_post_id_from_wordpress_post(self, ripped_wp_post: dict,  coop_post: COOPBlogPost) -> None:
-        coop_post.title = html.unescape(ripped_wp_post.get('title', {}).get('rendered', '').replace('<br>', ''))
+        title_raw = ripped_wp_post.get('title', {}).get('rendered', '')
+        coop_post.title = html.unescape(re.sub(r'<.*?>', '', title_raw))
+        # coop_post.title = html.unescape(ripped_wp_post.get('title', {}).get('rendered', '').replace('<br>', '').replace('<h2>', '').replace('</h2>', ''))
         coop_post.date = ripped_wp_post.get('date')
         coop_post.wordpress_post_id = ripped_wp_post.get('id')
         if not coop_post.wordpress_post_id:
@@ -102,7 +108,7 @@ class BlogProcessor:
     def _rip_paragraph_data_from_wordpress_post(self, post: COOPBlogPost, wp_p_tags) -> None:
         for idx, tag in enumerate(wp_p_tags):
             if idx == 0:
-                post.paragraph1 = str(tag)
+                post.paragraph1 = tag.text
             elif idx == 1:
                 post.paragraph2 = str(tag)
             elif idx == 2:
@@ -130,8 +136,12 @@ class BlogProcessor:
 
     def _download_post_image(self, post_data: COOPBlogPost, post_date: str) -> str:
         image_name = f"{post_date}_{post_data.brand}_promo.png"
-        image_path = os.path.join(self.html_to_upload_file_path, image_name)
-        urlretrieve(post_data.plan_image, image_path)
+        try:
+            image_path = os.path.join(self.html_to_upload_file_path, image_name)
+            urlretrieve(post_data.plan_image, image_path)
+        except Exception as e:
+            self.satellite_feed.error(str(e))
+            self.satellite_feed.info('ERROROR')
         return image_name
 
     @staticmethod
