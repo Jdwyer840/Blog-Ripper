@@ -16,9 +16,16 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
+
 from blog_ripper import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('blogrip/', views.rip_blogs)
+    path('blogrip/', views.rip_blogs),
+    path('api/V1/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/V1/token/refresh/', TokenRefreshView.as_view(), name='token_refresh')
 ]

@@ -14,7 +14,8 @@ class BaseTemplate:
     template: Optional[str] = None
 
     satellite = logging.getLogger('satellite_feed')
-    env = Environment(loader=FileSystemLoader(os.path.join(settings.BASE_DIR, 'templates')))
+    env = Environment(loader=FileSystemLoader(os.path.join(settings.BASE_DIR, 'templates')), enable_async=True)
+    # env.filters['render'] = str
 
     # def __init__(self, template_path: str, context: dict = None):
 

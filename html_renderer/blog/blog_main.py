@@ -1,6 +1,6 @@
 from html_renderer.blog.blog_post import BlogPost
 from html_renderer.blog.blog_post_content import BlogPostContent
-from utilities.wordpress_post import COOPBlogPost
+from blog_ripper.models import COOPBlogPost
 from html_renderer.base import BaseTemplate
 
 

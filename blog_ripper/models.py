@@ -5,6 +5,7 @@ from typing import Any
 from croniter import croniter
 from django.db import models
 from cron_descriptor import get_description
+from django.forms import model_to_dict
 
 from utilities.common import CoreUtilities
 from utilities.model_helpers import ModelMixins
@@ -153,13 +154,14 @@ class COOPBlogPost(ModelMixins.BaseModelWithoutBy):
     wordpress_post_id = models.BigIntegerField(null=False, blank=False)
     brand = models.CharField(max_length=255, null=False, blank=False)
     print_url = models.URLField(max_length=255, null=True, blank=True)
-    post_date = models.DateField(null=False, blank=False)  # Date-only for uniqueness
+    post_date = models.DateField(null=False, blank=False)
     title = models.CharField(max_length=255, null=False, blank=False)
     plan_image = models.URLField(max_length=255, null=True, blank=True)
     paragraph1 = models.TextField(null=True, blank=True)
     paragraph2 = models.TextField(null=True, blank=True)
     paragraph3 = models.TextField(null=True, blank=True)
     paragraph4 = models.TextField(null=True, blank=True)
+    is_success = models.BooleanField(default=False, null=False)
     blog_type = models.CharField(null=False, blank=False, choices=BlogTypes.choices, max_length=5)
 
     class Meta:
@@ -169,8 +171,11 @@ class COOPBlogPost(ModelMixins.BaseModelWithoutBy):
             models.UniqueConstraint(fields=['brand', 'title', 'post_date'], name='unique_post_constraint')
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.title or "WordPressPost"
+
+    def to_dict(self) -> dict:
+        return model_to_dict(self)
 
 
 class COOPBlogRipJobHistory(ModelMixins.BaseModelWithoutBy):

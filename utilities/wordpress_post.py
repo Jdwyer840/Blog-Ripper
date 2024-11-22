@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional
 # @dataclass
 
-
+# TODO terminate this class, use model instead, this was for funsies
 class COOPBlogPost:
     plan_url: Optional[str] = None
     wordpress_post_id: Optional[int] = None

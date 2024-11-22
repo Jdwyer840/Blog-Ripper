@@ -154,3 +154,8 @@ class CoreUtilities:
         """Convert datetime to date string"""
         datetime_obj = datetime.datetime.strptime(dt_str, dt_str_fmt)
         return CoreUtilities.datetime_format(datetime_obj, new_fmt)
+
+    @staticmethod
+    def write_file(file_path: str, content: str | bytes, mode: str = 'w', encoding: str = None):
+        with open(file_path, mode=mode, encoding=encoding) as file:
+            file.write(content)
