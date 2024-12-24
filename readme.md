@@ -6,7 +6,11 @@ TODOS
 4) FTP access
 5) chat with boss about this
 6) figure out plan for the main blog file, do we download the file and write to it? can we just write bytes directly to the file instead? im not sure if that is something we wana do or if it is normal.
+7) save instances for the blog job buddy
 
+
+
+notes and stuff and potential other todos below
 save blogs to the database
 
 

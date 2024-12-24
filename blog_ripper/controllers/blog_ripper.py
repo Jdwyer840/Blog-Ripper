@@ -18,9 +18,18 @@ from blog_ripper.models import COOPBlogPost
 
 
 class BlogRipper:
+    """TODO <img src="/blog/images/091318_shaw_promo.jpg" align="right" width="288">  this here appears to be the last date of a post
+    TODO  have command pass in a date range. if date range is far apart, no worries, will either need to write to the main file potentially in increments.
+     TODO so we will need to instead of overwrite, use some html package to insert new post data into the file.
+     TODO probably another method that will call process in a loop, might need some flags or something, but the main thing is there will need to be some new method that writes to the main blog file."""
 
-    def __init__(self, number_of_posts: int = 12):
-        self.url = "https://promotions.coopconnect.com/wp-json/wp/v2/posts/"
+    DEFAULT_WORDPRESS_URL: str = "https://promotions.coopconnect.com/wp-json/wp/v2/posts/"
+    DEFAULT_WORDPRESS_URL_DATE_RANGE: str = "https://promotions.coopconnect.com/wp-json/wp/v2/posts?after=2023-09-01T00:00:00&before=2023-12-01T00:00:00"
+
+    def __init__(self, mode: str = 'RAB', number_of_posts: int = 13, date_range: tuple[datetime.datetime, datetime.datetime] = None, blog_ripper_config: dict = None):
+        self.blogripper_config = blog_ripper_config if blog_ripper_config is not None else {}
+        self.url = self.blogripper_config.get('wordpress_url') or self.DEFAULT_WORDPRESS_URL
+        print(self.url)
         self.number_of_posts = number_of_posts
         self.posts_response: Optional[list[dict]] = None
         self.posts: list[COOPBlogPost] = []
@@ -39,8 +48,29 @@ class BlogRipper:
             self._write_coop_blog_posts_linked_html_files()
             self._save_post_data()
         except Exception as e:
-            self._handle_error()
+            self._handle_error(f'Processing blogs jobs failed {str(e)}')
 
+    def process_with_date_range(self, start_date: datetime.datetime, end_date: datetime.datetime, step_days: int = 7):
+        current_date = start_date
+        while current_date < end_date:
+            next_date = min(current_date + datetime.timedelta(days=step_days), end_date)
+            try:
+                self._fetch_posts_by_date_range(current_date, next_date)
+                self._build_coop_post_objects()
+                self._write_coop_blog_posts_linked_html_files()
+                self._save_post_data()
+                self.success_count += len(self.posts)
+            except Exception as e:
+                self._handle_error(f"Failed to process range {current_date} to {next_date}: {str(e)}")
+            current_date = next_date
+
+    def _fetch_posts_by_date_range(self, start_date: datetime.datetime, end_date: datetime.datetime):
+        url = f'{self.url}?after={start_date.isoformat()}&before={end_date.isoformat()}&per_page={self.number_of_posts}'
+        response = requests.get(url)
+        response.raise_for_status()
+        response.encoding = 'utf-8'
+        self.posts_response = response.json()
+        self.satellite_feed.info(f'Fetched posts from {start_date} to {end_date}')
 
     def _fetch_wordpress_post_data(self) -> None:
         self.satellite_feed.info('Fetching posts')
@@ -75,15 +105,47 @@ class BlogRipper:
         self.errors.append(err_msg)
         self.satellite_feed.error(err_msg)
 
+    # def _write_main_blog_html(self) -> None:
+    #     try:
+    #         self._write_html_file('blog_main.html', BlogMain(blog_post_objs=self.posts).render())
+    #     except Exception as e:
+    #         self._handle_error(f"ERROR: Failed to write main blog html content \nError Message: {str(e)}")
+
     def _write_main_blog_html(self) -> None:
         try:
-            self._write_html_file('blog_main.html', BlogMain(blog_post_objs=self.posts).render())
+            main_file_path = os.path.join(self.html_to_upload_file_path, 'blog_main.html')
+            if os.path.exists(main_file_path):
+                # Load existing content
+                with open(main_file_path, 'r', encoding='utf-8') as file:
+                    existing_html = file.read()
+
+                # Parse the existing HTML with BeautifulSoup
+                soup = BeautifulSoup(existing_html, "html.parser")
+                container_div = soup.find("div", {"id": "container"})
+
+                # Render new content and parse it
+                new_content = BlogMain(blog_post_objs=self.posts).render()
+                new_soup = BeautifulSoup(new_content, "html.parser")
+
+                # Insert new content at the top of the container
+                if container_div:
+                    container_div.insert(0, new_soup)
+
+                    # Save updated file
+                    with open(main_file_path, 'w', encoding='utf-8') as file:
+                        file.write(str(soup))
+                else:
+                    raise ValueError("Container div with id 'container' not found in HTML!")
+            else:
+                # Create a new file if it doesn't exist
+                self._write_html_file('blog_main.html', BlogMain(blog_post_objs=self.posts).render())
         except Exception as e:
-            self._handle_error(f"ERROR: Failed to write main blog html content \nError Message: {str(e)}")
+            self._handle_error(f"ERROR: Failed to update main blog HTML content \nError Message: {str(e)}")
 
     def _save_post_data(self) -> None:
-        for post in self.posts:
-            post.save()
+        pass
+        # for post in self.posts:
+        #     post.save()
 
     def _write_html_file(self, filename: str, post_html: str) -> None:
         CoreUtilities.write_file(file_path=os.path.join(self.html_to_upload_file_path, filename), mode='w', content=post_html, encoding='utf-8')
@@ -158,7 +220,7 @@ class BlogRipper:
             image_path = os.path.join(self.html_to_upload_file_path, image_name)
             urlretrieve(post_data.plan_image, image_path)
         except Exception as e:
-            self._handle_error(f"ERROR: could not download image.\nBlog ID: {post_data.wordpress_post_id}\nBlog Title: {post_data.title}\nError Message: {str((e))}")
+            self._handle_error(f"ERROR: could not download image.\nBlog ID: {post_data.wordpress_post_id}\nBlog Title: {post_data.title}\nError Message: {str(e)}")
         return image_name
 
     @staticmethod

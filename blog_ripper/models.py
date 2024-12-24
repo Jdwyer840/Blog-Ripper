@@ -161,10 +161,11 @@ class COOPBlogPost(ModelMixins.BaseModelWithoutBy):
     paragraph2 = models.TextField(null=True, blank=True)
     paragraph3 = models.TextField(null=True, blank=True)
     paragraph4 = models.TextField(null=True, blank=True)
-    is_success = models.BooleanField(default=False, null=False)
+    # is_success = models.BooleanField(default=False, null=False)
     blog_type = models.CharField(null=False, blank=False, choices=BlogTypes.choices, max_length=5)
 
     class Meta:
+        # todo the post id should be enough to determine uniqueness.
         db_table = "blog_post"
         verbose_name_plural = "Blog Posts"
         constraints = [

@@ -5,7 +5,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.request import Request
-from .controllers.blog_processor import BlogProcessor
+from .controllers.blog_ripper import BlogRipper
 
 satellite_feed = logging.getLogger('satellite_feed')
 
@@ -24,8 +24,8 @@ def rip_blogs(request: Request) -> Response:
     The raw post data should have some identifiers. we date and the brand should be enough
     We should also check for matching elements in the html. 
     We can start adding selector classes or something like that.
-
     """
+
     logger = logging.getLogger('satellite_feed')
     logger.debug('This is a DEBUG message')
     logger.info('This is an INFO message')
@@ -33,7 +33,7 @@ def rip_blogs(request: Request) -> Response:
     logger.error('This is an ERROR message')
     logger.critical('This is a CRITICAL message')
     try:
-        BlogProcessor(number_of_posts=10).process()
+        BlogRipper(number_of_posts=15).process()
         data = {
             "message": "Processing successful",
             "data": {}
